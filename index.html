@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cruciverba: la vita di Giovanni Verga</title>
+<style>
+  :root {
+    --bg: #faf6ee;
+    --ink: #2b2118;
+    --muted: #7a6a58;
+    --paper: #ffffff;
+    --line: #2b2118;
+    --accent: #b5502d;
+    --hl-word: #f6e0b8;
+    --hl-cell: #f0b45a;
+    --ok: #cfe8cf;
+    --bad: #f4c7c0;
+    --s: min(38px, calc((100vw - 32px) / 15));
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1d1812;
+      --ink: #f1e7d6;
+      --muted: #b3a38d;
+      --paper: #2a231a;
+      --line: #f1e7d6;
+      --accent: #e58a63;
+      --hl-word: #4a3a22;
+      --hl-cell: #8a6420;
+      --ok: #2f4a2f;
+      --bad: #5a2c26;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px 16px 48px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    line-height: 1.4;
+  }
+  main { max-width: 960px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 20px; }
+  h1 { font-size: clamp(1.5rem, 4vw, 2.2rem); margin: 0 0 4px; letter-spacing: .01em; }
+  .sub { color: var(--muted); font-style: italic; margin: 0; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 16px 0 20px; }
+  button {
+    font: inherit; font-size: .95rem; cursor: pointer;
+    padding: 8px 14px; border-radius: 6px;
+    border: 1px solid var(--ink); background: var(--paper); color: var(--ink);
+  }
+  button:hover { background: var(--hl-word); }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+  #msg { min-height: 1.6em; text-align: center; font-weight: bold; color: var(--accent); margin-bottom: 12px; }
+
+  .layout { display: grid; gap: 28px; grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 900px) { .layout { grid-template-columns: auto 1fr; } }
+
+  .board-wrap { overflow-x: auto; display: flex; justify-content: center; }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(15, var(--s));
+    grid-template-rows: repeat(15, var(--s));
+    gap: 0;
+  }
+  .cell { position: relative; width: var(--s); height: var(--s); }
+  .cell.block { background: transparent; }
+  .cell.open { background: var(--paper); border: 1px solid var(--line); margin: -0.5px; }
+  .cell.inword { background: var(--hl-word); }
+  .cell.active { background: var(--hl-cell); }
+  .cell.ok { background: var(--ok); }
+  .cell.bad { background: var(--bad); }
+  .cell .num {
+    position: absolute; top: 1px; left: 2px;
+    font: 600 calc(var(--s) * .28)/1 system-ui, sans-serif;
+    color: var(--muted); pointer-events: none;
+  }
+  .cell input {
+    width: 100%; height: 100%; border: 0; padding: 0;
+    background: transparent; color: var(--ink);
+    text-align: center; text-transform: uppercase;
+    font: 600 calc(var(--s) * .56) Georgia, serif;
+    caret-color: transparent; cursor: pointer;
+  }
+  .cell input::selection { background: transparent; }
+
+  .clues h2 {
+    font-size: 1.05rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--accent); margin: 0 0 8px; border-bottom: 2px solid var(--accent); padding-bottom: 4px;
+  }
+  .clues ol { list-style: none; padding: 0; margin: 0 0 22px; }
+  .clues li {
+    display: flex; gap: 10px; padding: 6px 8px; border-radius: 6px; cursor: pointer;
+  }
+  .clues li:hover { background: var(--hl-word); }
+  .clues li.current { background: var(--hl-cell); }
+  .clues .n { font-weight: bold; min-width: 1.6em; text-align: right; color: var(--accent); }
+  .clues .len { color: var(--muted); white-space: nowrap; }
+  footer { margin-top: 28px; text-align: center; color: var(--muted); font-size: .85rem; }
+  @media print {
+    .toolbar, #msg, footer { display: none; }
+    body { background: #fff; color: #000; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Cruciverba: la vita di Giovanni Verga</h1>
+    <p class="sub">10 parole · Catania 1840 – Catania 1922</p>
+  </header>
+
+  <div class="toolbar">
+    <button id="btnCheck">Verifica</button>
+    <button id="btnHint">Suggerisci una lettera</button>
+    <button id="btnWord">Rivela la parola</button>
+    <button id="btnAll">Rivela tutto</button>
+    <button id="btnClear">Ricomincia</button>
+  </div>
+  <div id="msg" role="status" aria-live="polite"></div>
+
+  <div class="layout">
+    <div class="board-wrap"><div id="board" role="grid" aria-label="Griglia del cruciverba"></div></div>
+    <div class="clues">
+      <h2>Orizzontali</h2>
+      <ol id="cluesA"></ol>
+      <h2>Verticali</h2>
+      <ol id="cluesD"></ol>
+    </div>
+  </div>
+
+  <footer>Clicca su una casella per iniziare · clicca di nuovo per cambiare direzione · frecce per muoverti</footer>
+</main>
+
+<script>
+const SIZE = 15;
+const WORDS = [
+  { n: 1, w: "MALAVOGLIA", r: 0, c: 5,  d: "D", clue: "Romanzo del 1881, primo capitolo del ciclo dei «Vinti»" },
+  { n: 2, w: "CAPUANA",    r: 1, c: 1,  d: "A", clue: "Luigi, scrittore e amico di Verga, teorico del Verismo" },
+  { n: 3, w: "VIZZINI",    r: 2, c: 8,  d: "A", clue: "Cittadina siciliana d'origine della famiglia Verga" },
+  { n: 3, w: "VERISMO",    r: 2, c: 8,  d: "D", clue: "Corrente letteraria di cui Verga fu il massimo esponente italiano" },
+  { n: 4, w: "MILANO",     r: 5, c: 0,  d: "A", clue: "Città lombarda dove Verga si trasferì nel 1872" },
+  { n: 5, w: "FIRENZE",    r: 7, c: 11, d: "D", clue: "Città toscana dove visse a partire dal 1865" },
+  { n: 6, w: "NOVELLE",    r: 7, c: 14, d: "D", clue: "Racconti brevi come quelli di «Vita dei campi» e «Rusticane»" },
+  { n: 7, w: "INCOMPIUTO", r: 8, c: 5,  d: "A", clue: "Così rimase il ciclo dei «Vinti», mai portato a termine" },
+  { n: 8, w: "CATANIA",    r: 8, c: 7,  d: "D", clue: "Città natale (1840) e luogo della morte (1922)" },
+  { n: 9, w: "MASTRO",     r: 8, c: 9,  d: "D", clue: "«…-don Gesualdo», ultimo romanzo compiuto del ciclo (1889)" },
+];
+
+const board = document.getElementById("board");
+const msg = document.getElementById("msg");
+const cells = {};            // "r,c" -> {r,c,letter,num,el,input,words:{A,D}}
+const key = (r, c) => r + "," + c;
+
+// Costruzione modello
+WORDS.forEach((word, idx) => {
+  word.cells = [];
+  for (let i = 0; i < word.w.length; i++) {
+    const r = word.r + (word.d === "D" ? i : 0);
+    const c = word.c + (word.d === "A" ? i : 0);
+    const k = key(r, c);
+    if (!cells[k]) cells[k] = { r, c, letter: word.w[i], num: null, words: {} };
+    cells[k].words[word.d] = idx;
+    word.cells.push(cells[k]);
+  }
+  const start = cells[key(word.r, word.c)];
+  start.num = word.n;
+});
+
+// Render griglia
+for (let r = 0; r < SIZE; r++) {
+  for (let c = 0; c < SIZE; c++) {
+    const div = document.createElement("div");
+    const cell = cells[key(r, c)];
+    if (!cell) { div.className = "cell block"; board.appendChild(div); continue; }
+    div.className = "cell open";
+    div.setAttribute("role", "gridcell");
+    if (cell.num) {
+      const s = document.createElement("span");
+      s.className = "num"; s.textContent = cell.num; div.appendChild(s);
+    }
+    const input = document.createElement("input");
+    input.type = "text"; input.maxLength = 2; input.autocomplete = "off";
+    input.autocapitalize = "characters"; input.spellcheck = false;
+    input.setAttribute("aria-label", "Riga " + (r + 1) + ", colonna " + (c + 1));
+    div.appendChild(input);
+    board.appendChild(div);
+    cell.el = div; cell.input = input;
+    input.addEventListener("focus", () => onFocus(cell));
+    input.addEventListener("mousedown", e => { onClick(cell, e); });
+    input.addEventListener("input", () => onInput(cell));
+    input.addEventListener("keydown", e => onKey(cell, e));
+  }
+}
+
+// Indizi
+WORDS.forEach((word, idx) => {
+  const li = document.createElement("li");
+  li.dataset.idx = idx;
+  li.innerHTML = '<span class="n">' + word.n + '</span><span>' + word.clue +
+                 ' <span class="len">(' + word.w.length + ')</span></span>';
+  li.addEventListener("click", () => { dir = word.d; focusCell(word.cells[0], word.d); });
+  document.getElementById(word.d === "A" ? "cluesA" : "cluesD").appendChild(li);
+  word.li = li;
+});
+
+let dir = "A";
+let current = null;
+
+function currentWord(cell, d) {
+  const idx = cell.words[d];
+  return idx === undefined ? null : WORDS[idx];
+}
+
+function highlight() {
+  Object.values(cells).forEach(c => c.el.classList.remove("inword", "active"));
+  WORDS.forEach(w => w.li.classList.remove("current"));
+  if (!current) return;
+  const w = currentWord(current, dir);
+  if (w) {
+    w.cells.forEach(c => c.el.classList.add("inword"));
+    w.li.classList.add("current");
+  }
+  current.el.classList.add("active");
+}
+
+function focusCell(cell, d) {
+  if (d) dir = d;
+  if (!currentWord(cell, dir)) dir = dir === "A" ? "D" : "A";
+  cell.input.focus();
+  cell.input.select();
+  current = cell;
+  highlight();
+}
+
+function onFocus(cell) {
+  current = cell;
+  if (!currentWord(cell, dir)) dir = dir === "A" ? "D" : "A";
+  highlight();
+  cell.input.select();
+}
+
+function onClick(cell, e) {
+  if (current === cell && cell.words.A !== undefined && cell.words.D !== undefined) {
+    dir = dir === "A" ? "D" : "A";
+    highlight();
+  }
+}
+
+function step(cell, d, delta) {
+  const r = cell.r + (d === "D" ? delta : 0);
+  const c = cell.c + (d === "A" ? delta : 0);
+  return cells[key(r, c)] || null;
+}
+
+function clearMarks() {
+  Object.values(cells).forEach(c => c.el.classList.remove("ok", "bad"));
+}
+
+function onInput(cell) {
+  clearMarks();
+  msg.textContent = "";
+  const v = cell.input.value.toUpperCase().replace(/[^A-ZÀ-Ý]/g, "");
+  cell.input.value = v.slice(-1);
+  if (cell.input.value) {
+    const next = step(cell, dir, 1);
+    if (next && currentWord(cell, dir) && currentWord(cell, dir).cells.includes(next)) focusCell(next);
+    else cell.input.select();
+  }
+  checkWin();
+}
+
+function onKey(cell, e) {
+  const arrows = { ArrowRight: ["A", 1], ArrowLeft: ["A", -1], ArrowDown: ["D", 1], ArrowUp: ["D", -1] };
+  if (arrows[e.key]) {
+    e.preventDefault();
+    const [d, delta] = arrows[e.key];
+    if (dir !== d && currentWord(cell, d)) { dir = d; highlight(); return; }
+    const n = step(cell, d, delta);
+    if (n) focusCell(n, d);
+  } else if (e.key === "Backspace") {
+    e.preventDefault();
+    clearMarks();
+    if (cell.input.value) { cell.input.value = ""; return; }
+    const p = step(cell, dir, -1);
+    if (p) { p.input.value = ""; focusCell(p); }
+  } else if (e.key === " " || e.key === "Enter") {
+    e.preventDefault();
+    if (cell.words.A !== undefined && cell.words.D !== undefined) {
+      dir = dir === "A" ? "D" : "A"; highlight();
+    }
+  }
+}
+
+function checkWin() {
+  const all = Object.values(cells);
+  if (all.every(c => c.input.value === c.letter)) {
+    msg.textContent = "Complimenti! Cruciverba completato 🎉";
+    all.forEach(c => c.el.classList.add("ok"));
+  }
+}
+
+document.getElementById("btnCheck").onclick = () => {
+  let filled = 0, wrong = 0;
+  Object.values(cells).forEach(c => {
+    c.el.classList.remove("ok", "bad");
+    if (c.input.value) {
+      filled++;
+      if (c.input.value === c.letter) c.el.classList.add("ok");
+      else { c.el.classList.add("bad"); wrong++; }
+    }
+  });
+  msg.textContent = filled === 0 ? "Nessuna lettera inserita."
+    : wrong === 0 ? "Finora è tutto corretto!" : wrong + (wrong === 1 ? " lettera errata." : " lettere errate.");
+};
+
+document.getElementById("btnHint").onclick = () => {
+  const w = current && currentWord(current, dir);
+  const pool = (w ? w.cells : Object.values(cells)).filter(c => c.input.value !== c.letter);
+  if (!pool.length) return;
+  const c = (current && pool.includes(current)) ? current : pool[0];
+  c.input.value = c.letter;
+  clearMarks();
+  checkWin();
+};
+
+document.getElementById("btnWord").onclick = () => {
+  const w = current && currentWord(current, dir);
+  if (!w) { msg.textContent = "Seleziona prima una casella."; return; }
+  w.cells.forEach(c => c.input.value = c.letter);
+  clearMarks();
+  checkWin();
+};
+
+document.getElementById("btnAll").onclick = () => {
+  Object.values(cells).forEach(c => c.input.value = c.letter);
+  clearMarks();
+  msg.textContent = "Soluzione mostrata.";
+};
+
+document.getElementById("btnClear").onclick = () => {
+  Object.values(cells).forEach(c => c.input.value = "");
+  clearMarks();
+  msg.textContent = "";
+  const first = cells[key(WORDS[0].r, WORDS[0].c)];
+  focusCell(first, "D");
+};
+</script>
+</body>
+</html>
